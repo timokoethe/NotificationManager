@@ -17,3 +17,12 @@ https://github.com/timokoethe/NotificationManager.git
 6.  To complete hit _Add Package_
 7.  Add ```import NotificationManager```to the top of the files in which you want to use it.
 <br>
+
+## Functionality
+The Package works fine on all apple plattforms. After adding the package dependencies to your Xcode project, you have 
+access to different methods for managing local notifications.
+
+1. Request user permission
+
+
+Most of the methods work asynchronous to not block the main thread in order to prevent from lagging screens etc.
