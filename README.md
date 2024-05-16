@@ -25,12 +25,12 @@ access to different methods for managing local notifications.
 Each method cann be called by adding: ```NotificationManager.functionName()```.
 
 ## Contributing
-We welcome contributions from the community to help improve ShiftClocker. If you encounter any bugs, have feature requests, or would like to contribute code, please feel free to open an issue or submit a pull request on our GitHub repository.
+We welcome contributions from the community to help improve NotificationManager. If you encounter any bugs, have feature requests, or would like to contribute code, please feel free to open an issue or submit a pull request on our GitHub repository.
 
 ## Support
-If you have any questions, feedback, or need assistance with ShiftClocker, please don't hesitate to contact us. We're here to help!
+If you have any questions, feedback, or need assistance with NotificationManager, please don't hesitate to contact us. We're here to help!
 
 ## License
-ShiftClocker is released under the [MIT License](https://opensource.org/license/mit).
+NotificationManager is released under the [MIT License](https://opensource.org/license/mit).
 
 Feel free to adjust and expand upon this template to better suit your project's needs!
