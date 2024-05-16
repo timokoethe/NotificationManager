@@ -1,5 +1,7 @@
 # NotificationManager
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](https://opensource.org/license/mit)
+[![Build Package](https://github.com/timokoethe/NotificationManager/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/timokoethe/NotificationManager/actions/workflows/build.yml)
+[![Test Package](https://github.com/timokoethe/NotificationManager/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/timokoethe/NotificationManager/actions/workflows/test.yml)
 
 NotificationManager is a Swift Package to make your code easier for managing local notifications.
 This package is supposed to make it possible to manage notifications in a highly intuitive way.
@@ -16,15 +18,19 @@ https://github.com/timokoethe/NotificationManager.git
 5.  Choose the right target under _Add to project_.
 6.  To complete hit _Add Package_
 7.  Add ```import NotificationManager```to the top of the files in which you want to use it.
-<br>
 
-## Functionality
-The Package works fine on all apple plattforms. After adding the package dependencies to your Xcode project, you have 
+## Usage
+The package works fine on all apple plattforms. After adding the package dependencies to your Xcode project, you have 
 access to different methods for managing local notifications.
+Each method cann be called by adding: ```NotificationManager.functionName()```.
 
-1. Request user permission
+## Contributing
+We welcome contributions from the community to help improve ShiftClocker. If you encounter any bugs, have feature requests, or would like to contribute code, please feel free to open an issue or submit a pull request on our GitHub repository.
 
+## Support
+If you have any questions, feedback, or need assistance with ShiftClocker, please don't hesitate to contact us. We're here to help!
 
-Most of the methods work asynchronous to not block the main thread in order to prevent from lagging screens etc.
+## License
+ShiftClocker is released under the [MIT License](https://opensource.org/license/mit).
 
-Each function has to be called: NotificationManager.functionName()
+Feel free to adjust and expand upon this template to better suit your project's needs!
