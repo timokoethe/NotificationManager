@@ -1,7 +1,7 @@
 # NotificationManager
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](https://opensource.org/license/mit)
-[![Build Package](https://github.com/timokoethe/NotificationManager/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/timokoethe/NotificationManager/actions/workflows/build.yml)
-[![Test Package](https://github.com/timokoethe/NotificationManager/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/timokoethe/NotificationManager/actions/workflows/test.yml)
+[![Build](https://github.com/timokoethe/NotificationManager/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/timokoethe/NotificationManager/actions/workflows/build.yml)
+[![Test](https://github.com/timokoethe/NotificationManager/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/timokoethe/NotificationManager/actions/workflows/test.yml)
 
 NotificationManager is a Swift Package to make your code easier for managing local notifications.
 This package is supposed to make it possible to manage notifications in a highly intuitive way.
