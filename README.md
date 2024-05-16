@@ -26,3 +26,5 @@ access to different methods for managing local notifications.
 
 
 Most of the methods work asynchronous to not block the main thread in order to prevent from lagging screens etc.
+
+Each function has to be called: NotificationManager.functionName()

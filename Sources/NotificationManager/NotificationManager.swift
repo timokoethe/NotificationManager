@@ -172,4 +172,18 @@ public struct NotificationManager {
     public static func removeAllPendingNotificationRequests() {
         center.removeAllPendingNotificationRequests()
     }
+    
+    // MARK: Others
+    @available(macOS 13.0, *)
+    /// Updates the applications badge count.
+    /// - Parameter badge: badge count
+    public static func setBadge(badge: Int) {
+        UNUserNotificationCenter.current().setBadgeCount(badge)
+    }
+    
+    @available(macOS 13.0, *)
+    /// Resets the applicaitons badge count.
+    public static func resetBadge() {
+        UNUserNotificationCenter.current().setBadgeCount(0)
+    }
 }
