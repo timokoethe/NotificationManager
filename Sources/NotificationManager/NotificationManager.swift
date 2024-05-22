@@ -110,6 +110,36 @@ public struct NotificationManager {
         }
     }
     
+    /// Schedules a notification to arrive after a certain time interval in seconds from now. The notificaiton will repeat
+    /// after the time interval.
+    /// - Parameters:
+    ///   - id: unique id of the notification
+    ///   - title: title of the notification that should be shown
+    ///   - body: body of the notification that should be shown
+    ///   - timeInterval: time interval in seconds from now when the notification should arrive
+    public static func scheduleRepeatNotification(id: String, title: String, body: String, timeInterval: Int) {
+        if timeInterval > 0 {
+            //Content
+            let content = UNMutableNotificationContent()
+            content.title = title
+            content.body = body
+            content.sound = .default
+            
+            //Trigger
+            let trigger = UNTimeIntervalNotificationTrigger(timeInterval: TimeInterval(timeInterval), repeats: true)
+            
+            //Request
+            let request = UNNotificationRequest(identifier: id, content: content, trigger: trigger)
+            
+            //Schedule
+            center.add(request) { (error) in
+                if let error = error {
+                    print("Error: " + error.localizedDescription)
+                }
+             }
+        }
+    }
+    
     // MARK: Fetch
     /// Fetches all of your app’s local notifications that are pending delivery.
     /// - Returns: array containing all pending notification requests
@@ -127,7 +157,6 @@ public struct NotificationManager {
         notificationRequests = await center.pendingNotificationRequests()
         
         guard notificationRequests.isEmpty else {
-            print("Hey")
             for notificationRequest in notificationRequests {
                 notificationIds.append(notificationRequest.identifier)
             }
@@ -171,6 +200,17 @@ public struct NotificationManager {
     /// Removes all pending notifications. Attention: Removed pending notifications cannot be restored.
     public static func removeAllPendingNotificationRequests() {
         center.removeAllPendingNotificationRequests()
+    }
+    
+    /// Removes all delivered notifications. Attention: Removed notifications cannot be restored.
+    public static func removeAllDeliveredNotificationRequests() {
+        center.removeAllDeliveredNotifications()
+    }
+    
+    /// Removes certain pending notifications. Attention: Removed pending notifications cannot be restored.
+    /// - Parameter ids: unique identifiers of notifications
+    public static func removePendingNotificationRequests(ids: [String]) {
+        center.removePendingNotificationRequests(withIdentifiers: ids)
     }
     
     // MARK: Others
