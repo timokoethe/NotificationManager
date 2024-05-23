@@ -12,8 +12,7 @@ It shall also appear as minimalistic as possible.
 - macOS 10.15+
 - iOS 13.0+
 - watchOS 6.0+
-- tvOS 12.0+
-- visionOS 1.0+
+
 
 ## Installation
 1.  Copy the resource url:

@@ -214,6 +214,7 @@ public struct NotificationManager {
     }
     
     // MARK: Others
+    @available(iOS 16.0, *)
     @available(macOS 13.0, *)
     /// Updates the applications badge count.
     /// - Parameter badge: badge count
@@ -221,6 +222,7 @@ public struct NotificationManager {
         UNUserNotificationCenter.current().setBadgeCount(badge)
     }
     
+    @available(iOS 16.0, *)
     @available(macOS 13.0, *)
     /// Resets the applicaitons badge count.
     public static func resetBadge() {
