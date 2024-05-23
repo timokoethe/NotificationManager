@@ -41,6 +41,13 @@ public struct NotificationManager {
         return status
     }
     
+    /// Requests authorization for certain authorization options for local notifications in an asynchronous way.
+    /// If the authorization process returns an error, the error is thrown.
+    /// - Parameter options: authorization options of UNAuthorizationOptions
+    public static func requestAuthorization(for options: UNAuthorizationOptions) async throws {
+        try await center.requestAuthorization(options: options)
+    }
+    
     /// Retrieves the authorization settings for your app.
     /// - Returns: Constants indicating whether the app is allowed to schedule notifications.
     public static func getAuthorizationStatus() async -> UNAuthorizationStatus {
@@ -224,7 +231,7 @@ public struct NotificationManager {
     
     @available(iOS 16.0, *)
     @available(macOS 13.0, *)
-    /// Resets the applicaitons badge count.
+    /// Resets the applications badge count.
     public static func resetBadge() {
         UNUserNotificationCenter.current().setBadgeCount(0)
     }
