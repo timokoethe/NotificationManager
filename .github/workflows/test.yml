@@ -17,7 +17,3 @@ jobs:
           swift-version: '5.9'
       - name: Run Tests
         run: swift test -v
-      - name: Upload coverage reports to Codecov
-        uses: codecov/codecov-action@v4.0.1
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
