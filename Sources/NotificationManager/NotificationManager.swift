@@ -12,7 +12,7 @@ public struct NotificationManager {
     /// Requests authorization for alerts, sound and badges for local notifications.
     /// If the authorization process returns an error, the error message is printed to the console.
     public static func requestAuthorization() {
-        center.requestAuthorization(options: [.alert, .sound, .badge]) { _, error in
+        center.requestAuthorization(options: [.alert, .sound, .badge, .carPlay, .criticalAlert, .provisional]) { _, error in
             if let error = error {
                 print("Error: " + error.localizedDescription)
             }
@@ -25,7 +25,7 @@ public struct NotificationManager {
     public static func requestAuthorization() async -> Bool {
         var status = false
         do {
-            try await status = center.requestAuthorization(options: [.alert, .sound, .badge])
+            try await status = center.requestAuthorization(options: [.alert, .sound, .badge, .carPlay, .criticalAlert, .provisional])
         } catch {
             print("Error: " + error.localizedDescription)
         }
@@ -37,10 +37,17 @@ public struct NotificationManager {
     /// - Returns: true if authorization process went good, otherwise false
     public static func requestAuthorizationThrowable() async throws -> Bool {
         var status = false
-        try await status = center.requestAuthorization(options: [.alert, .sound, .badge])
+        try await status = center.requestAuthorization(options: [.alert, .sound, .badge, .carPlay, .criticalAlert, .provisional])
         return status
     }
     
+    /// Requests authorization for certain authorization options for local notifications in an asynchronous way.
+    /// If the authorization process returns an error, the error is thrown.
+    /// - Parameter options: authorization options of UNAuthorizationOptions
+    public static func requestAuthorization(for options: UNAuthorizationOptions) async throws {
+        try await center.requestAuthorization(options: options)
+    }
+
     /// Retrieves the authorization settings for your app.
     /// - Returns: Constants indicating whether the app is allowed to schedule notifications.
     public static func getAuthorizationStatus() async -> UNAuthorizationStatus {
@@ -110,6 +117,35 @@ public struct NotificationManager {
         }
     }
     
+    /// Schedules a notification to arrive after a certain time interval in seconds from now.
+    /// - Parameters:
+    ///   - id: unique id of the notification
+    ///   - title: title of the notification that should be shown
+    ///   - body: body of the notification that should be shown
+    ///   - timeInterval: time interval in seconds from now when the notification should arrive
+    public static func scheduleNotification(id: String, title: String, body: String, timeInterval: Int) {
+        if timeInterval > 0 {
+            //Content
+            let content = UNMutableNotificationContent()
+            content.title = title
+            content.body = body
+            content.sound = .default
+            
+            //Trigger
+            let trigger = UNTimeIntervalNotificationTrigger(timeInterval: TimeInterval(timeInterval), repeats: false)
+            
+            //Request
+            let request = UNNotificationRequest(identifier: id, content: content, trigger: trigger)
+            
+            //Schedule
+            center.add(request) { (error) in
+                if let error = error {
+                    print("Error: " + error.localizedDescription)
+                }
+             }
+        }
+    }
+  
     /// Schedules a notification to arrive after a certain time interval in seconds from now. The notificaiton will repeat
     /// after the time interval.
     /// - Parameters:
@@ -216,7 +252,7 @@ public struct NotificationManager {
     // MARK: Others
     @available(iOS 16.0, *)
     @available(macOS 13.0, *)
-    /// Updates the applications badge count.
+    /// Updates the application's badge count.
     /// - Parameter badge: badge count
     public static func setBadge(badge: Int) {
         UNUserNotificationCenter.current().setBadgeCount(badge)
@@ -224,7 +260,7 @@ public struct NotificationManager {
     
     @available(iOS 16.0, *)
     @available(macOS 13.0, *)
-    /// Resets the applicaitons badge count.
+    /// Resets the application's badge count.
     public static func resetBadge() {
         UNUserNotificationCenter.current().setBadgeCount(0)
     }

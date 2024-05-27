@@ -2,6 +2,8 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](https://opensource.org/license/mit)
 [![Build](https://github.com/timokoethe/NotificationManager/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/timokoethe/NotificationManager/actions/workflows/build.yml)
 [![Test](https://github.com/timokoethe/NotificationManager/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/timokoethe/NotificationManager/actions/workflows/test.yml)
+[![](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2Ftimokoethe%2FNotificationManager%2Fbadge%3Ftype%3Dswift-versions)](https://swiftpackageindex.com/timokoethe/NotificationManager)
+[![](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2Ftimokoethe%2FNotificationManager%2Fbadge%3Ftype%3Dplatforms)](https://swiftpackageindex.com/timokoethe/NotificationManager)
 
 NotificationManager is a Swift Package to make your code easier for managing local notifications.
 This package is supposed to make it possible to manage notifications in a highly intuitive way.
@@ -9,9 +11,11 @@ It shall also appear as minimalistic as possible.
 
 ## Requirements
 - Xcode 15.0+
+- Swift 5.9+
 - macOS 10.15+
 - iOS 13.0+
 - watchOS 6.0+
+- tvOS 12.0+
 
 
 ## Installation
@@ -69,7 +73,7 @@ struct ContentView: View {
 }
 ```
 
-- Getting pending notifications
+- Getting pending notifications <br>
 Once you have scheduled one or more notifications you can get all pending:
 ```
 import SwiftUI
