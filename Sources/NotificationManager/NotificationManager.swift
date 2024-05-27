@@ -12,7 +12,7 @@ public struct NotificationManager {
     /// Requests authorization for alerts, sound and badges for local notifications.
     /// If the authorization process returns an error, the error message is printed to the console.
     public static func requestAuthorization() {
-        center.requestAuthorization(options: [.alert, .sound, .badge]) { _, error in
+        center.requestAuthorization(options: [.alert, .sound, .badge, .carPlay, .criticalAlert, .provisional]) { _, error in
             if let error = error {
                 print("Error: " + error.localizedDescription)
             }
@@ -25,7 +25,7 @@ public struct NotificationManager {
     public static func requestAuthorization() async -> Bool {
         var status = false
         do {
-            try await status = center.requestAuthorization(options: [.alert, .sound, .badge])
+            try await status = center.requestAuthorization(options: [.alert, .sound, .badge, .carPlay, .criticalAlert, .provisional])
         } catch {
             print("Error: " + error.localizedDescription)
         }
@@ -37,7 +37,7 @@ public struct NotificationManager {
     /// - Returns: true if authorization process went good, otherwise false
     public static func requestAuthorizationThrowable() async throws -> Bool {
         var status = false
-        try await status = center.requestAuthorization(options: [.alert, .sound, .badge])
+        try await status = center.requestAuthorization(options: [.alert, .sound, .badge, .carPlay, .criticalAlert, .provisional])
         return status
     }
     
