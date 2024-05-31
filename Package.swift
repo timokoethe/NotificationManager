@@ -7,9 +7,8 @@ let package = Package(
     name: "NotificationManager",
     platforms: [
         .macOS(.v10_15),
-        .iOS(.v13),     
-        .watchOS(.v6),
-        .tvOS(.v12)
+        .iOS(.v13),   
+            .visionOS(.v1)
     ],
     products: [
         .library(
