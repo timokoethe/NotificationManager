@@ -1,238 +1,317 @@
 import Foundation
 import UserNotifications
 
-/// This represents the main class for managing local notifications. To get the functions
-/// work, permission needs to be requested from the user.
+protocol UserNotificationCenter {
+    func requestAuthorization(options: UNAuthorizationOptions) async throws -> Bool
+    func authorizationStatus() async -> UNAuthorizationStatus
+    func addNotificationRequest(_ request: UNNotificationRequest) async throws
+    func pendingNotificationRequests() async -> [UNNotificationRequest]
+    func removeAllPendingNotificationRequests()
+    func removeAllDeliveredNotifications()
+    func removePendingNotificationRequests(withIdentifiers identifiers: [String])
+    @available(iOS 16.0, macOS 13.0, visionOS 1.0, *)
+    func setBadgeCount(_ count: Int) async throws
+}
+
+extension UNUserNotificationCenter: UserNotificationCenter {
+    func authorizationStatus() async -> UNAuthorizationStatus {
+        await notificationSettings().authorizationStatus
+    }
+
+    func addNotificationRequest(_ request: UNNotificationRequest) async throws {
+        try await add(request)
+    }
+}
+
+/// Errors produced while validating a notification request.
+public enum NotificationManagerError: Error, Equatable {
+    /// A non-repeating notification must have a positive time interval.
+    case invalidTimeInterval
+    /// A repeating notification must have a time interval of at least 60 seconds.
+    case repeatingTimeIntervalTooShort
+    /// A date-based notification must be scheduled for a future date.
+    case triggerDateMustBeInFuture
+}
+
+extension NotificationManagerError: LocalizedError {
+    public var errorDescription: String? {
+        switch self {
+        case .invalidTimeInterval:
+            return "The notification time interval must be greater than zero."
+        case .repeatingTimeIntervalTooShort:
+            return "Repeating notifications require a time interval of at least 60 seconds."
+        case .triggerDateMustBeInFuture:
+            return "The notification trigger date must be in the future."
+        }
+    }
+}
+
+/// Manages local notification authorization, scheduling, querying, and removal.
 public struct NotificationManager {
-    // MARK: Variables in Context
-    // Instance of the UNUserNotificationCenter to get access to all methods.
-    private static let center = UNUserNotificationCenter.current()
-    
+    private static let defaultAuthorizationOptions: UNAuthorizationOptions = [.alert, .sound, .badge]
+    private static var centerOverride: (any UserNotificationCenter)?
+    static var center: any UserNotificationCenter {
+        get { centerOverride ?? UNUserNotificationCenter.current() }
+        set { centerOverride = newValue }
+    }
+
+    static func resetCenter() {
+        centerOverride = nil
+    }
+
     // MARK: Authorization
-    /// Requests authorization for alerts, sound and badges for local notifications.
-    /// If the authorization process returns an error, the error message is printed to the console.
+
+    /// Requests authorization for alerts, sounds, and badges.
     public static func requestAuthorization() {
-        center.requestAuthorization(options: [.alert, .sound, .badge, .carPlay, .criticalAlert, .provisional]) { _, error in
-            if let error = error {
+        Task {
+            do {
+                _ = try await center.requestAuthorization(options: defaultAuthorizationOptions)
+            } catch {
                 print("Error: " + error.localizedDescription)
             }
         }
     }
-    
-    /// Requests authorization for alerts, sound and badges for local notifications in an asynchronous way.
-    /// If the authorization process returns an error, the error message is printed to the console.
-    /// - Returns: true if authorization process went good, otherwise false
+
+    /// Requests authorization for alerts, sounds, and badges.
+    /// - Returns: Whether the user granted authorization.
     public static func requestAuthorization() async -> Bool {
-        var status = false
         do {
-            try await status = center.requestAuthorization(options: [.alert, .sound, .badge, .carPlay, .criticalAlert, .provisional])
+            return try await center.requestAuthorization(options: defaultAuthorizationOptions)
         } catch {
             print("Error: " + error.localizedDescription)
+            return false
         }
-        return status
     }
-    
-    /// Requests authorization for alerts, sound and badges for local notifications in an asynchronous way.
-    /// If the authorization process returns an error, the error is thrown.
-    /// - Returns: true if authorization process went good, otherwise false
+
+    /// Requests authorization for alerts, sounds, and badges.
+    /// - Returns: Whether the user granted authorization.
     public static func requestAuthorizationThrowable() async throws -> Bool {
-        var status = false
-        try await status = center.requestAuthorization(options: [.alert, .sound, .badge, .carPlay, .criticalAlert, .provisional])
-        return status
+        try await center.requestAuthorization(options: defaultAuthorizationOptions)
     }
-    
-    /// Requests authorization for certain authorization options for local notifications in an asynchronous way.
-    /// If the authorization process returns an error, the error is thrown.
-    /// - Parameter options: authorization options of UNAuthorizationOptions
-    public static func requestAuthorization(for options: UNAuthorizationOptions) async throws {
+
+    /// Requests authorization for the supplied options.
+    /// - Parameter options: The notification authorization options to request.
+    /// - Returns: Whether the user granted authorization.
+    @discardableResult
+    public static func requestAuthorization(for options: UNAuthorizationOptions) async throws -> Bool {
         try await center.requestAuthorization(options: options)
     }
 
-    /// Retrieves the authorization settings for your app.
-    /// - Returns: Constants indicating whether the app is allowed to schedule notifications.
+    /// Retrieves the current notification authorization status.
     public static func getAuthorizationStatus() async -> UNAuthorizationStatus {
-        var notificationSettings: UNNotificationSettings
-        notificationSettings = await center.notificationSettings()
-        return notificationSettings.authorizationStatus
+        await center.authorizationStatus()
     }
-    
+
     // MARK: Schedule
-    /// Schedules a notification to arrive at a certain point of time from now.
-    /// - Parameters:
-    ///   - id: unique id of the notification
-    ///   - title: title of the notification that should be shown
-    ///   - body: body of the notification that should be shown
-    ///   - triggerDate: exact date when the notification should arrive
+
+    /// Schedules a notification for a future date and reports scheduling errors.
+    public static func scheduleNotification(
+        id: String,
+        title: String,
+        body: String,
+        triggerDate: Date
+    ) async throws {
+        let timeInterval = triggerDate.timeIntervalSinceNow
+        guard timeInterval > 0 else {
+            throw NotificationManagerError.triggerDateMustBeInFuture
+        }
+
+        try await scheduleNotification(
+            id: id,
+            title: title,
+            body: body,
+            timeInterval: timeInterval,
+            repeats: false
+        )
+    }
+
+    /// Schedules a notification for a future date.
     public static func scheduleNotification(id: String, title: String, body: String, triggerDate: Date) {
-        if triggerDate > Date() {
-            //Content
-            let content = UNMutableNotificationContent()
-            content.title = title
-            content.body = body
-            content.sound = .default
-            
-            let timeInterval = triggerDate.timeIntervalSince(Date())
-            
-            //Trigger
-            let trigger = UNTimeIntervalNotificationTrigger(timeInterval: timeInterval, repeats: false)
-            
-            //Request
-            let request = UNNotificationRequest(identifier: id, content: content, trigger: trigger)
-            
-            //Schedule
-            center.add(request) { (error) in
-                if let error = error {
-                    print("Error: " + error.localizedDescription)
-                }
-             }
-        }
-    }
-    
-    /// Schedules a notification to arrive after a certain time interval in seconds from now.
-    /// - Parameters:
-    ///   - id: unique id of the notification
-    ///   - title: title of the notification that should be shown
-    ///   - body: body of the notification that should be shown
-    ///   - timeInterval: time interval in seconds from now when the notification should arrive
-    public static func scheduleNotification(id: String, title: String, body: String, timeInterval: Int) {
-        if timeInterval > 0 {
-            //Content
-            let content = UNMutableNotificationContent()
-            content.title = title
-            content.body = body
-            content.sound = .default
-            
-            //Trigger
-            let trigger = UNTimeIntervalNotificationTrigger(timeInterval: TimeInterval(timeInterval), repeats: false)
-            
-            //Request
-            let request = UNNotificationRequest(identifier: id, content: content, trigger: trigger)
-            
-            //Schedule
-            center.add(request) { (error) in
-                if let error = error {
-                    print("Error: " + error.localizedDescription)
-                }
-             }
-        }
-    }
-  
-    /// Schedules a notification to arrive after a certain time interval in seconds from now. The notificaiton will repeat
-    /// after the time interval.
-    /// - Parameters:
-    ///   - id: unique id of the notification
-    ///   - title: title of the notification that should be shown
-    ///   - body: body of the notification that should be shown
-    ///   - timeInterval: time interval in seconds from now when the notification should arrive
-    public static func scheduleRepeatNotification(id: String, title: String, body: String, timeInterval: Int) {
-        if timeInterval > 0 {
-            //Content
-            let content = UNMutableNotificationContent()
-            content.title = title
-            content.body = body
-            content.sound = .default
-            
-            //Trigger
-            let trigger = UNTimeIntervalNotificationTrigger(timeInterval: TimeInterval(timeInterval), repeats: true)
-            
-            //Request
-            let request = UNNotificationRequest(identifier: id, content: content, trigger: trigger)
-            
-            //Schedule
-            center.add(request) { (error) in
-                if let error = error {
-                    print("Error: " + error.localizedDescription)
-                }
-             }
-        }
-    }
-    
-    // MARK: Fetch
-    /// Fetches all of your app’s local notifications that are pending delivery.
-    /// - Returns: array containing all pending notification requests
-    public static func getPendingNotificationRequests() async -> [UNNotificationRequest] {
-        var notificationRequests: [UNNotificationRequest]
-        notificationRequests = await center.pendingNotificationRequests()
-        return notificationRequests
-    }
-    
-    /// Fetches all of your app’s local notifications identifiers that are pending delivery.
-    /// - Returns: array containing all identifiers of pending notification requests
-    public static func getPendingNotificationRequestsIds() async -> [String] {
-        var notificationRequests: [UNNotificationRequest]
-        var notificationIds = [String]()
-        notificationRequests = await center.pendingNotificationRequests()
-        
-        guard notificationRequests.isEmpty else {
-            for notificationRequest in notificationRequests {
-                notificationIds.append(notificationRequest.identifier)
+        Task {
+            do {
+                try await scheduleNotification(id: id, title: title, body: body, triggerDate: triggerDate)
+            } catch {
+                print("Error: " + error.localizedDescription)
             }
-            return notificationIds
         }
-        
-        return notificationIds
     }
-    
+
+    /// Schedules a notification after a positive number of seconds and reports scheduling errors.
+    public static func scheduleNotification(
+        id: String,
+        title: String,
+        body: String,
+        timeInterval: Int
+    ) async throws {
+        try await scheduleNotification(
+            id: id,
+            title: title,
+            body: body,
+            timeInterval: TimeInterval(timeInterval),
+            repeats: false
+        )
+    }
+
+    /// Schedules a notification after a positive number of seconds.
+    public static func scheduleNotification(id: String, title: String, body: String, timeInterval: Int) {
+        Task {
+            do {
+                try await scheduleNotification(id: id, title: title, body: body, timeInterval: timeInterval)
+            } catch {
+                print("Error: " + error.localizedDescription)
+            }
+        }
+    }
+
+    /// Schedules a repeating notification and reports scheduling errors.
+    public static func scheduleRepeatNotification(
+        id: String,
+        title: String,
+        body: String,
+        timeInterval: Int
+    ) async throws {
+        try await scheduleNotification(
+            id: id,
+            title: title,
+            body: body,
+            timeInterval: TimeInterval(timeInterval),
+            repeats: true
+        )
+    }
+
+    /// Schedules a repeating notification. Repeating intervals must be at least 60 seconds.
+    public static func scheduleRepeatNotification(id: String, title: String, body: String, timeInterval: Int) {
+        Task {
+            do {
+                try await scheduleRepeatNotification(
+                    id: id,
+                    title: title,
+                    body: body,
+                    timeInterval: timeInterval
+                )
+            } catch {
+                print("Error: " + error.localizedDescription)
+            }
+        }
+    }
+
+    private static func scheduleNotification(
+        id: String,
+        title: String,
+        body: String,
+        timeInterval: TimeInterval,
+        repeats: Bool
+    ) async throws {
+        guard timeInterval > 0 else {
+            throw NotificationManagerError.invalidTimeInterval
+        }
+        guard !repeats || timeInterval >= 60 else {
+            throw NotificationManagerError.repeatingTimeIntervalTooShort
+        }
+
+        let content = UNMutableNotificationContent()
+        content.title = title
+        content.body = body
+        content.sound = .default
+
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: timeInterval, repeats: repeats)
+        let request = UNNotificationRequest(identifier: id, content: content, trigger: trigger)
+        try await center.addNotificationRequest(request)
+    }
+
+    // MARK: Fetch
+
+    /// Fetches all pending local notification requests.
+    public static func getPendingNotificationRequests() async -> [UNNotificationRequest] {
+        await center.pendingNotificationRequests()
+    }
+
+    /// Fetches the identifiers of all pending local notification requests.
+    public static func getPendingNotificationRequestsIds() async -> [String] {
+        await center.pendingNotificationRequests().map(\.identifier)
+    }
+
     // MARK: Update
-    /// Updates an already scheduled notification according to new parameters. If the notification's id
-    /// does not exist, nothing happens.
-    /// - Parameters:
-    ///   - id: unique id of the notification
-    ///   - newTitle: new title of the notification
-    ///   - newBody: new body of the notification
-    ///   - newDate: new exact date when the notification should arrive
-    public static func replaceNotificationRequestFromId(id: String, newTitle: String, newBody: String, newDate: Date) async throws {
+
+    /// Replaces an existing pending notification. If the identifier does not exist, nothing happens.
+    public static func replaceNotificationRequestFromId(
+        id: String,
+        newTitle: String,
+        newBody: String,
+        newDate: Date
+    ) async throws {
         let requests = await center.pendingNotificationRequests()
-        guard !requests.isEmpty else { return }
-        guard requests.contains(where: {$0.identifier == id}) else { return }
-        
-        // Remove old notification
-        center.removePendingNotificationRequests(withIdentifiers: [id])
-        
-        // New content
-        let newContent = UNMutableNotificationContent()
-        newContent.title = newTitle
-        newContent.body = newBody
-        
-        // New Trigger
-        let newTimeInterval = newDate.timeIntervalSince(Date())
-        let newTrigger = UNTimeIntervalNotificationTrigger(timeInterval: newTimeInterval, repeats: false)
-        
-        // New Request
-        let newRequest = UNNotificationRequest(identifier: id, content: newContent, trigger: newTrigger)
-        try await center.add(newRequest)
+        guard requests.contains(where: { $0.identifier == id }) else {
+            return
+        }
+
+        let timeInterval = newDate.timeIntervalSinceNow
+        guard timeInterval > 0 else {
+            throw NotificationManagerError.triggerDateMustBeInFuture
+        }
+
+        // Adding a request with an existing identifier atomically replaces the old request.
+        try await scheduleNotification(
+            id: id,
+            title: newTitle,
+            body: newBody,
+            timeInterval: timeInterval,
+            repeats: false
+        )
     }
-    
+
     // MARK: Remove
-    /// Removes all pending notifications. Attention: Removed pending notifications cannot be restored.
+
+    /// Removes all pending notifications.
     public static func removeAllPendingNotificationRequests() {
         center.removeAllPendingNotificationRequests()
     }
-    
-    /// Removes all delivered notifications. Attention: Removed notifications cannot be restored.
+
+    /// Removes all delivered notifications.
     public static func removeAllDeliveredNotificationRequests() {
         center.removeAllDeliveredNotifications()
     }
-    
-    /// Removes certain pending notifications. Attention: Removed pending notifications cannot be restored.
-    /// - Parameter ids: unique identifiers of notifications
+
+    /// Removes pending notifications with the supplied identifiers.
     public static func removePendingNotificationRequests(ids: [String]) {
         center.removePendingNotificationRequests(withIdentifiers: ids)
     }
-    
-    // MARK: Others
-    @available(iOS 16.0, *)
-    @available(macOS 13.0, *)
+
+    // MARK: Badge
+
     /// Updates the application's badge count.
-    /// - Parameter badge: badge count
-    public static func setBadge(badge: Int) {
-        UNUserNotificationCenter.current().setBadgeCount(badge)
+    @available(iOS 16.0, macOS 13.0, visionOS 1.0, *)
+    public static func setBadge(badge: Int) async throws {
+        try await center.setBadgeCount(badge)
     }
-    
-    @available(iOS 16.0, *)
-    @available(macOS 13.0, *)
+
+    /// Updates the application's badge count.
+    @available(iOS 16.0, macOS 13.0, visionOS 1.0, *)
+    public static func setBadge(badge: Int) {
+        Task {
+            do {
+                try await setBadge(badge: badge)
+            } catch {
+                print("Error: " + error.localizedDescription)
+            }
+        }
+    }
+
     /// Resets the application's badge count.
+    @available(iOS 16.0, macOS 13.0, visionOS 1.0, *)
+    public static func resetBadge() async throws {
+        try await center.setBadgeCount(0)
+    }
+
+    /// Resets the application's badge count.
+    @available(iOS 16.0, macOS 13.0, visionOS 1.0, *)
     public static func resetBadge() {
-        UNUserNotificationCenter.current().setBadgeCount(0)
+        Task {
+            do {
+                try await resetBadge()
+            } catch {
+                print("Error: " + error.localizedDescription)
+            }
+        }
     }
 }

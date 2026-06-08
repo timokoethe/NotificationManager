@@ -7,19 +7,22 @@ let package = Package(
     name: "NotificationManager",
     platforms: [
         .macOS(.v10_15),
-        .iOS(.v13),   
-            .visionOS(.v1)
+        .iOS(.v13),
+        .visionOS(.v1)
     ],
     products: [
         .library(
             name: "NotificationManager",
-            targets: ["NotificationManager"]),
+            targets: ["NotificationManager"]
+        ),
     ],
     targets: [
         .target(
-            name: "NotificationManager"),
+            name: "NotificationManager"
+        ),
         .testTarget(
             name: "NotificationManagerTests",
-            dependencies: ["NotificationManager"]),
+            dependencies: ["NotificationManager"]
+        ),
     ]
 )

@@ -1,120 +1,200 @@
 # NotificationManager
+
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](https://opensource.org/license/mit)
 [![Build](https://github.com/timokoethe/NotificationManager/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/timokoethe/NotificationManager/actions/workflows/build.yml)
 [![Test](https://github.com/timokoethe/NotificationManager/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/timokoethe/NotificationManager/actions/workflows/test.yml)
-[![](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2Ftimokoethe%2FNotificationManager%2Fbadge%3Ftype%3Dswift-versions)](https://swiftpackageindex.com/timokoethe/NotificationManager)
-[![](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2Ftimokoethe%2FNotificationManager%2Fbadge%3Ftype%3Dplatforms)](https://swiftpackageindex.com/timokoethe/NotificationManager)
+[![Swift versions](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2Ftimokoethe%2FNotificationManager%2Fbadge%3Ftype%3Dswift-versions)](https://swiftpackageindex.com/timokoethe/NotificationManager)
+[![Platforms](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2Ftimokoethe%2FNotificationManager%2Fbadge%3Ftype%3Dplatforms)](https://swiftpackageindex.com/timokoethe/NotificationManager)
 
-NotificationManager is a Swift Package to make your code easier for managing local notifications.
-This package is supposed to make it possible to manage notifications in a highly intuitive way.
-It shall also appear as minimalistic as possible.
+NotificationManager is a lightweight Swift package for requesting notification authorization and managing local notifications.
 
 ## Requirements
-- Xcode 15.0+
+
 - Swift 5.9+
-- macOS 10.15+
+- Xcode 15.0+
 - iOS 13.0+
+- macOS 10.15+
 - visionOS 1.0+
 
 ## Installation
-1.  Copy the resource url:
-```
+
+Add the package in Xcode using **File > Add Package Dependencies** and enter:
+
+```text
 https://github.com/timokoethe/NotificationManager.git
 ```
-2.  Open your Xcode project.
-3.  Navigate to _File_ / _Add Package Dependency_.
-4.  Paste the resource url at the top right corner in _Search or Enter Package URL_.
-5.  Choose the right target under _Add to project_.
-6.  To complete hit _Add Package_.
 
-## Setup
-1. Importing the Framework <br>
-In any Swift file where you want to use NotificationManager, add the following import statement:
-```import NotificationManager```
+Add `NotificationManager` to your target and import it:
 
-2. Request notification authorization <br>
-Before your app can send notifications, you need to request permission from the user. This is typically done when the app first launches. Add the following code to your App struct or the place wherever you want to ask the user to permit:
+```swift
+import NotificationManager
 ```
-import SwiftUI
+
+## Authorization
+
+Request the standard alert, sound, and badge permissions at a point where the user understands why notifications are needed:
+
+```swift
+do {
+    let granted = try await NotificationManager.requestAuthorizationThrowable()
+
+    if granted {
+        // Notifications are authorized.
+    }
+} catch {
+    // Handle the authorization error.
+}
+```
+
+To request custom options:
+
+```swift
 import UserNotifications
-import NotificationManager
 
-@main
-struct YourApp: App {
-    var body: some Scene {
-        WindowGroup {
-            ContentView()
-                .onAppear {
-                    requestNotificationAuthorization()
-                }
-        }
-    }
+let granted = try await NotificationManager.requestAuthorization(
+    for: [.alert, .sound, .badge, .provisional]
+)
+```
+
+Read the current authorization status:
+
+```swift
+let status = await NotificationManager.getAuthorizationStatus()
+```
+
+## Scheduling
+
+The asynchronous APIs validate their input and propagate errors from `UNUserNotificationCenter`.
+
+Schedule a notification after a time interval:
+
+```swift
+try await NotificationManager.scheduleNotification(
+    id: UUID().uuidString,
+    title: "Reminder",
+    body: "Your task is due.",
+    timeInterval: 10
+)
+```
+
+Schedule a notification for a date:
+
+```swift
+let deliveryDate = Date().addingTimeInterval(60)
+
+try await NotificationManager.scheduleNotification(
+    id: "task-reminder",
+    title: "Reminder",
+    body: "Your task is due.",
+    triggerDate: deliveryDate
+)
+```
+
+Schedule a repeating notification:
+
+```swift
+try await NotificationManager.scheduleRepeatNotification(
+    id: "hourly-reminder",
+    title: "Reminder",
+    body: "Take a short break.",
+    timeInterval: 3_600
+)
+```
+
+Repeating notifications require an interval of at least 60 seconds.
+
+For compatibility, synchronous fire-and-forget overloads are also available. They print scheduling errors instead of returning them:
+
+```swift
+NotificationManager.scheduleNotification(
+    id: "task-reminder",
+    title: "Reminder",
+    body: "Your task is due.",
+    timeInterval: 10
+)
+```
+
+## Error Handling
+
+Input validation uses `NotificationManagerError`:
+
+```swift
+do {
+    try await NotificationManager.scheduleRepeatNotification(
+        id: "reminder",
+        title: "Reminder",
+        body: "This interval is too short.",
+        timeInterval: 30
+    )
+} catch NotificationManagerError.repeatingTimeIntervalTooShort {
+    // Repeating intervals must be at least 60 seconds.
+} catch {
+    // Handle errors from the notification center.
 }
 ```
 
-## Usage
-- Scheduling a Notification <br>
-Once you have authorization, you can schedule notifications. Here's an example of how to schedule a notification that should arrive after 10 seconds using NotificationManager by pushing a button:
+Available validation errors:
 
-```
-import SwiftUI
-import NotificationManager
+- `invalidTimeInterval`
+- `repeatingTimeIntervalTooShort`
+- `triggerDateMustBeInFuture`
 
-struct ContentView: View {
-    var body: some View {
-        VStack {
-            Button("Schedule") {
-                NotificationManager.scheduleNotification(id: UUID().uuidString, title: "Title", body: "Body", triggerDate: Date()+10)
-            }
-        }
-    }
-}
+## Pending Notifications
+
+Fetch all pending requests:
+
+```swift
+import UserNotifications
+
+let requests: [UNNotificationRequest] =
+    await NotificationManager.getPendingNotificationRequests()
 ```
 
-- Getting pending notifications <br>
-Once you have scheduled one or more notifications you can get all pending:
-```
-import SwiftUI
-import NotificationManager
+Fetch only their identifiers:
 
-struct ContentView: View {
-    @State private var notifications = [UNNotificationRequest]()
-    var body: some View {
-        VStack {
-            Button("Get") {
-                Task {
-                    notifications = await NotificationManager.getPendingNotificationRequests()
-                }
-            }
-        }
-    }
-}
+```swift
+let identifiers = await NotificationManager.getPendingNotificationRequestsIds()
 ```
 
-- Removing all pending notifications <br>
-After scheduling several notifications you can remove them easily:
-```
-import SwiftUI
-import NotificationManager
+## Replacing Notifications
 
-struct ContentView: View {
-    var body: some View {
-        VStack {
-            Button("Remove") {
-                NotificationManager.removeAllPendingNotificationRequests()
-            }
-        }
-    }
-}
+Replace a pending notification while keeping its identifier:
+
+```swift
+try await NotificationManager.replaceNotificationRequestFromId(
+    id: "task-reminder",
+    newTitle: "Updated reminder",
+    newBody: "The task deadline has changed.",
+    newDate: Date().addingTimeInterval(300)
+)
+```
+
+If no pending request has the supplied identifier, the method returns without making changes.
+
+## Removing Notifications
+
+```swift
+NotificationManager.removePendingNotificationRequests(
+    ids: ["task-reminder", "hourly-reminder"]
+)
+
+NotificationManager.removeAllPendingNotificationRequests()
+NotificationManager.removeAllDeliveredNotificationRequests()
+```
+
+## Badge Count
+
+Badge updates are available on iOS 16+, macOS 13+, and visionOS 1+:
+
+```swift
+try await NotificationManager.setBadge(badge: 3)
+try await NotificationManager.resetBadge()
 ```
 
 ## Contributing
-We welcome contributions from the community to help improve NotificationManager. If you encounter any bugs, have feature requests, or would like to contribute code, please feel free to open an issue or submit a pull request on our GitHub repository.
 
-## Support
-If you have any questions, feedback, or need assistance with NotificationManager, please don't hesitate to contact us. We're here to help!
+Bug reports, feature requests, and pull requests are welcome through the GitHub repository.
 
 ## License
-NotificationManager is released under the [MIT License](https://opensource.org/license/mit).
 
-Feel free to adjust and expand upon this template to better suit your project's needs!
+NotificationManager is available under the [MIT License](LICENSE).

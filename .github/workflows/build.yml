@@ -1,19 +1,40 @@
 name: Build
 
-on: 
-    push:
-        branches:
-            - main
-            - development
+on:
+  push:
+    branches:
+      - main
+      - development
+  pull_request:
 
 jobs:
   build:
-    name: Build
+    name: Build (${{ matrix.platform }})
     runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macOS
+            destination: generic/platform=macOS
+            sdk: macosx
+          - platform: iOS
+            destination: generic/platform=iOS
+            sdk: iphoneos
+          - platform: visionOS
+            destination: generic/platform=visionOS
+            sdk: xros
     steps:
       - uses: actions/checkout@v4
-      - uses: swift-actions/setup-swift@v2
-        with:
-          swift-version: '5.9'
       - name: Build
-        run: swift build
+        run: |
+          if ! xcrun --sdk '${{ matrix.sdk }}' --show-sdk-path >/dev/null 2>&1; then
+            echo "::notice::Skipping ${{ matrix.platform }} because its SDK is not installed on this runner."
+            exit 0
+          fi
+
+          xcodebuild \
+            -scheme NotificationManager \
+            -destination '${{ matrix.destination }}' \
+            CODE_SIGNING_ALLOWED=NO \
+            build

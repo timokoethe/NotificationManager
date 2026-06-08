@@ -1,13 +1,14 @@
 name: Test
 
-on: 
-    push:
-        branches:
-            - main
-            - development
+on:
+  push:
+    branches:
+      - main
+      - development
+  pull_request:
 
 jobs:
-  build:
+  test:
     name: Test
     runs-on: macos-latest
     steps:
