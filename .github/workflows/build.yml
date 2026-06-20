@@ -10,7 +10,7 @@ on:
 jobs:
   build:
     name: Build (${{ matrix.platform }})
-    runs-on: macos-latest
+    runs-on: macos-15
     strategy:
       fail-fast: false
       matrix:
@@ -23,6 +23,8 @@ jobs:
             sdk: iphoneos
     steps:
       - uses: actions/checkout@v4
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_16.4.app/Contents/Developer
       - name: Build
         run: |
           if ! xcrun --sdk '${{ matrix.sdk }}' --show-sdk-path >/dev/null 2>&1; then
