@@ -1,0 +1,46 @@
+name: Feature request
+description: Suggest an improvement for NotificationManager.
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for helping improve NotificationManager.
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What should NotificationManager support or improve?
+      placeholder: NotificationManager should make it possible to...
+    validations:
+      required: true
+  - type: textarea
+    id: use-case
+    attributes:
+      label: Use Case
+      description: Describe the app scenario or notification workflow this would help with.
+      placeholder: In an iOS/macOS/visionOS app, I want to...
+    validations:
+      required: true
+  - type: textarea
+    id: api
+    attributes:
+      label: Proposed API
+      description: If you have an API shape in mind, share a small Swift example.
+      render: swift
+  - type: dropdown
+    id: platforms
+    attributes:
+      label: Platforms
+      description: Which platforms should this apply to?
+      multiple: true
+      options:
+        - iOS
+        - macOS
+        - visionOS
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional Context
+      description: Add links, alternatives, or implementation notes if relevant.

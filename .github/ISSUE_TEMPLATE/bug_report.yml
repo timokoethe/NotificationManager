@@ -1,0 +1,59 @@
+name: Package bug report
+description: Report something that is not working with NotificationManager.
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for helping improve NotificationManager.
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What happened, and what did you expect instead?
+      placeholder: NotificationManager should... but it...
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to Reproduce
+      placeholder: |
+        1. Add NotificationManager via Swift Package Manager
+        2. Call NotificationManager...
+        3. Observe ...
+    validations:
+      required: true
+  - type: textarea
+    id: code
+    attributes:
+      label: Minimal Code Example
+      description: Share the smallest Swift snippet that reproduces the issue.
+      render: swift
+  - type: input
+    id: version
+    attributes:
+      label: NotificationManager Version
+      placeholder: v1.2.0
+    validations:
+      required: true
+  - type: input
+    id: swift
+    attributes:
+      label: Swift / Xcode Version
+      placeholder: Swift 5.9 / Xcode 15.x
+    validations:
+      required: true
+  - type: input
+    id: platform
+    attributes:
+      label: Platform Version
+      placeholder: iOS 17.x, macOS 15.x, or visionOS 1.x
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional Context
+      description: Add logs, authorization status, notification settings, or anything else that helps.
