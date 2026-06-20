@@ -21,7 +21,7 @@ final class NotificationManagerTests: XCTestCase {
     func testDefaultAuthorizationRequestsOnlyAlertSoundAndBadge() async throws {
         center.authorizationGranted = true
 
-        let granted = try await NotificationManager.requestAuthorizationThrowable()
+        let granted = try await NotificationManager.requestAuthorizationThrowing()
 
         XCTAssertTrue(granted)
         XCTAssertEqual(center.requestedAuthorizationOptions, [.alert, .sound, .badge])
@@ -175,9 +175,37 @@ final class NotificationManagerTests: XCTestCase {
             UNNotificationRequest(identifier: "second", content: UNMutableNotificationContent(), trigger: nil)
         ]
 
-        let identifiers = await NotificationManager.getPendingNotificationRequestsIds()
+        let identifiers = await NotificationManager.getPendingNotificationRequestIDs()
 
         XCTAssertEqual(identifiers, ["first", "second"])
+    }
+
+    func testDeliveredNotificationsAreReturned() async {
+        center.deliveredNotificationValues = [
+            makeDeliveredNotification(identifier: "first"),
+            makeDeliveredNotification(identifier: "second")
+        ]
+
+        let notifications = await NotificationManager.getDeliveredNotifications()
+
+        XCTAssertEqual(notifications.map(\.request.identifier), ["first", "second"])
+    }
+
+    func testDeliveredNotificationIdentifiersAreMappedDirectly() async {
+        center.deliveredNotificationValues = [
+            makeDeliveredNotification(identifier: "first"),
+            makeDeliveredNotification(identifier: "second")
+        ]
+
+        let identifiers = await NotificationManager.getDeliveredNotificationIDs()
+
+        XCTAssertEqual(identifiers, ["first", "second"])
+    }
+
+    func testRemoveDeliveredNotificationsPassesIdentifiersThrough() {
+        NotificationManager.removeDeliveredNotifications(ids: ["first", "second"])
+
+        XCTAssertEqual(center.removedDeliveredIdentifierGroups, [["first", "second"]])
     }
 }
 
@@ -188,7 +216,9 @@ private final class TestNotificationCenter: UserNotificationCenter {
     var addedRequests: [UNNotificationRequest] = []
     var addError: Error?
     var pendingRequests: [UNNotificationRequest] = []
+    var deliveredNotificationValues: [UNNotification] = []
     var removedIdentifierGroups: [[String]] = []
+    var removedDeliveredIdentifierGroups: [[String]] = []
     var removedAllPendingRequests = false
     var removedAllDeliveredNotifications = false
     var badgeCounts: [Int] = []
@@ -213,6 +243,10 @@ private final class TestNotificationCenter: UserNotificationCenter {
         pendingRequests
     }
 
+    func deliveredNotifications() async -> [UNNotification] {
+        deliveredNotificationValues
+    }
+
     func removeAllPendingNotificationRequests() {
         removedAllPendingRequests = true
     }
@@ -225,6 +259,10 @@ private final class TestNotificationCenter: UserNotificationCenter {
         removedIdentifierGroups.append(identifiers)
     }
 
+    func removeDeliveredNotifications(withIdentifiers identifiers: [String]) {
+        removedDeliveredIdentifierGroups.append(identifiers)
+    }
+
     func setBadgeCount(_ count: Int) async throws {
         badgeCounts.append(count)
     }
@@ -232,6 +270,32 @@ private final class TestNotificationCenter: UserNotificationCenter {
 
 private enum TestError: Error, Equatable {
     case addFailed
+}
+
+private func makeDeliveredNotification(identifier: String) -> UNNotification {
+    let request = UNNotificationRequest(
+        identifier: identifier,
+        content: UNMutableNotificationContent(),
+        trigger: nil
+    )
+
+    return UNNotification(coder: TestNotificationCoder(request: request))!
+}
+
+private final class TestNotificationCoder: NSCoder {
+    private let request: UNNotificationRequest
+
+    init(request: UNNotificationRequest) {
+        self.request = request
+    }
+
+    override var allowsKeyedCoding: Bool {
+        true
+    }
+
+    override func decodeObject(forKey key: String) -> Any? {
+        key == "request" ? request : nil
+    }
 }
 
 private func XCTAssertThrowsErrorAsync<T>(

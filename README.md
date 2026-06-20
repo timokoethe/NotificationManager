@@ -36,7 +36,7 @@ Request the standard alert, sound, and badge permissions at a point where the us
 
 ```swift
 do {
-    let granted = try await NotificationManager.requestAuthorizationThrowable()
+    let granted = try await NotificationManager.requestAuthorizationThrowing()
 
     if granted {
         // Notifications are authorized.
@@ -153,7 +153,14 @@ let requests: [UNNotificationRequest] =
 Fetch only their identifiers:
 
 ```swift
-let identifiers = await NotificationManager.getPendingNotificationRequestsIds()
+let identifiers = await NotificationManager.getPendingNotificationRequestIDs()
+```
+
+Fetch delivered notifications and their identifiers:
+
+```swift
+let deliveredNotifications = await NotificationManager.getDeliveredNotifications()
+let deliveredIDs = await NotificationManager.getDeliveredNotificationIDs()
 ```
 
 ## Replacing Notifications
@@ -176,6 +183,10 @@ If no pending request has the supplied identifier, the method returns without ma
 ```swift
 NotificationManager.removePendingNotificationRequests(
     ids: ["task-reminder", "hourly-reminder"]
+)
+
+NotificationManager.removeDeliveredNotifications(
+    ids: ["task-reminder"]
 )
 
 NotificationManager.removeAllPendingNotificationRequests()
