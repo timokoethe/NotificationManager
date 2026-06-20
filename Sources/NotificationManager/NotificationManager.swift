@@ -6,9 +6,11 @@ protocol UserNotificationCenter {
     func authorizationStatus() async -> UNAuthorizationStatus
     func addNotificationRequest(_ request: UNNotificationRequest) async throws
     func pendingNotificationRequests() async -> [UNNotificationRequest]
+    func deliveredNotifications() async -> [UNNotification]
     func removeAllPendingNotificationRequests()
     func removeAllDeliveredNotifications()
     func removePendingNotificationRequests(withIdentifiers identifiers: [String])
+    func removeDeliveredNotifications(withIdentifiers identifiers: [String])
     @available(iOS 16.0, macOS 13.0, visionOS 1.0, *)
     func setBadgeCount(_ count: Int) async throws
 }
@@ -85,8 +87,15 @@ public struct NotificationManager {
 
     /// Requests authorization for alerts, sounds, and badges.
     /// - Returns: Whether the user granted authorization.
-    public static func requestAuthorizationThrowable() async throws -> Bool {
+    public static func requestAuthorizationThrowing() async throws -> Bool {
         try await center.requestAuthorization(options: defaultAuthorizationOptions)
+    }
+
+    /// Requests authorization for alerts, sounds, and badges.
+    /// - Returns: Whether the user granted authorization.
+    @available(*, deprecated, renamed: "requestAuthorizationThrowing()")
+    public static func requestAuthorizationThrowable() async throws -> Bool {
+        try await requestAuthorizationThrowing()
     }
 
     /// Requests authorization for the supplied options.
@@ -227,8 +236,24 @@ public struct NotificationManager {
     }
 
     /// Fetches the identifiers of all pending local notification requests.
-    public static func getPendingNotificationRequestsIds() async -> [String] {
+    public static func getPendingNotificationRequestIDs() async -> [String] {
         await center.pendingNotificationRequests().map(\.identifier)
+    }
+
+    /// Fetches the identifiers of all pending local notification requests.
+    @available(*, deprecated, renamed: "getPendingNotificationRequestIDs()")
+    public static func getPendingNotificationRequestsIds() async -> [String] {
+        await getPendingNotificationRequestIDs()
+    }
+
+    /// Fetches all delivered local notifications.
+    public static func getDeliveredNotifications() async -> [UNNotification] {
+        await center.deliveredNotifications()
+    }
+
+    /// Fetches the identifiers of all delivered local notifications.
+    public static func getDeliveredNotificationIDs() async -> [String] {
+        await center.deliveredNotifications().map(\.request.identifier)
     }
 
     // MARK: Update
@@ -275,6 +300,11 @@ public struct NotificationManager {
     /// Removes pending notifications with the supplied identifiers.
     public static func removePendingNotificationRequests(ids: [String]) {
         center.removePendingNotificationRequests(withIdentifiers: ids)
+    }
+
+    /// Removes delivered notifications with the supplied identifiers.
+    public static func removeDeliveredNotifications(ids: [String]) {
+        center.removeDeliveredNotifications(withIdentifiers: ids)
     }
 
     // MARK: Badge
