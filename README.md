@@ -198,8 +198,10 @@ NotificationManager.removeAllDeliveredNotificationRequests()
 Badge updates are available on iOS 16+, macOS 13+, and visionOS 1+:
 
 ```swift
-try await NotificationManager.setBadge(badge: 3)
-try await NotificationManager.resetBadge()
+if #available(iOS 16.0, macOS 13.0, visionOS 1.0, *) {
+    try await NotificationManager.setBadge(badge: 3)
+    try await NotificationManager.resetBadge()
+}
 ```
 
 ## Contributing
