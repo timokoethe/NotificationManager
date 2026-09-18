@@ -64,6 +64,10 @@ public struct NotificationManager {
     // MARK: Authorization
 
     /// Requests authorization for alerts, sounds, and badges.
+    ///
+    /// This fire-and-forget overload prints authorization errors instead of
+    /// returning them to the caller. Prefer the throwing asynchronous overload
+    /// when the result or error needs to be handled explicitly.
     public static func requestAuthorization() {
         Task {
             do {
@@ -76,6 +80,8 @@ public struct NotificationManager {
 
     /// Requests authorization for alerts, sounds, and badges.
     /// - Returns: Whether the user granted authorization.
+    /// - Note: Authorization errors are printed and result in `false`. Use
+    ///   ``requestAuthorizationThrowing()`` to propagate errors.
     public static func requestAuthorization() async -> Bool {
         do {
             return try await center.requestAuthorization(options: defaultAuthorizationOptions)
@@ -87,12 +93,14 @@ public struct NotificationManager {
 
     /// Requests authorization for alerts, sounds, and badges.
     /// - Returns: Whether the user granted authorization.
+    /// - Throws: An error from the system notification center.
     public static func requestAuthorizationThrowing() async throws -> Bool {
         try await center.requestAuthorization(options: defaultAuthorizationOptions)
     }
 
     /// Requests authorization for alerts, sounds, and badges.
     /// - Returns: Whether the user granted authorization.
+    /// - Throws: An error from the system notification center.
     @available(*, deprecated, renamed: "requestAuthorizationThrowing()")
     public static func requestAuthorizationThrowable() async throws -> Bool {
         try await requestAuthorizationThrowing()
@@ -101,12 +109,14 @@ public struct NotificationManager {
     /// Requests authorization for the supplied options.
     /// - Parameter options: The notification authorization options to request.
     /// - Returns: Whether the user granted authorization.
+    /// - Throws: An error from the system notification center.
     @discardableResult
     public static func requestAuthorization(for options: UNAuthorizationOptions) async throws -> Bool {
         try await center.requestAuthorization(options: options)
     }
 
     /// Retrieves the current notification authorization status.
+    /// - Returns: The current authorization status reported by the system.
     public static func getAuthorizationStatus() async -> UNAuthorizationStatus {
         await center.authorizationStatus()
     }
@@ -114,6 +124,13 @@ public struct NotificationManager {
     // MARK: Schedule
 
     /// Schedules a notification for a future date and reports scheduling errors.
+    /// - Parameters:
+    ///   - id: A stable identifier for the notification request.
+    ///   - title: The title shown in the notification.
+    ///   - body: The body shown in the notification.
+    ///   - triggerDate: The future date at which the notification should be delivered.
+    /// - Throws: ``NotificationManagerError/triggerDateMustBeInFuture`` or an
+    ///   error from the system notification center.
     public static func scheduleNotification(
         id: String,
         title: String,
@@ -134,7 +151,14 @@ public struct NotificationManager {
         )
     }
 
-    /// Schedules a notification for a future date.
+    /// Schedules a notification for a future date without waiting for completion.
+    /// - Parameters:
+    ///   - id: A stable identifier for the notification request.
+    ///   - title: The title shown in the notification.
+    ///   - body: The body shown in the notification.
+    ///   - triggerDate: The future date at which the notification should be delivered.
+    /// - Note: Validation and scheduling errors are printed instead of returned
+    ///   to the caller.
     public static func scheduleNotification(id: String, title: String, body: String, triggerDate: Date) {
         Task {
             do {
@@ -146,6 +170,13 @@ public struct NotificationManager {
     }
 
     /// Schedules a notification after a positive number of seconds and reports scheduling errors.
+    /// - Parameters:
+    ///   - id: A stable identifier for the notification request.
+    ///   - title: The title shown in the notification.
+    ///   - body: The body shown in the notification.
+    ///   - timeInterval: The delay before delivery, in seconds.
+    /// - Throws: ``NotificationManagerError/invalidTimeInterval`` or an error
+    ///   from the system notification center.
     public static func scheduleNotification(
         id: String,
         title: String,
@@ -161,7 +192,14 @@ public struct NotificationManager {
         )
     }
 
-    /// Schedules a notification after a positive number of seconds.
+    /// Schedules a notification after a positive number of seconds without waiting for completion.
+    /// - Parameters:
+    ///   - id: A stable identifier for the notification request.
+    ///   - title: The title shown in the notification.
+    ///   - body: The body shown in the notification.
+    ///   - timeInterval: The delay before delivery, in seconds.
+    /// - Note: Validation and scheduling errors are printed instead of returned
+    ///   to the caller.
     public static func scheduleNotification(id: String, title: String, body: String, timeInterval: Int) {
         Task {
             do {
@@ -173,6 +211,15 @@ public struct NotificationManager {
     }
 
     /// Schedules a repeating notification and reports scheduling errors.
+    /// - Parameters:
+    ///   - id: A stable identifier for the notification request.
+    ///   - title: The title shown in the notification.
+    ///   - body: The body shown in the notification.
+    ///   - timeInterval: The interval between deliveries, in seconds. It must
+    ///     be at least 60 seconds.
+    /// - Throws: ``NotificationManagerError/invalidTimeInterval``,
+    ///   ``NotificationManagerError/repeatingTimeIntervalTooShort``, or an
+    ///   error from the system notification center.
     public static func scheduleRepeatNotification(
         id: String,
         title: String,
@@ -188,7 +235,15 @@ public struct NotificationManager {
         )
     }
 
-    /// Schedules a repeating notification. Repeating intervals must be at least 60 seconds.
+    /// Schedules a repeating notification without waiting for completion.
+    /// - Parameters:
+    ///   - id: A stable identifier for the notification request.
+    ///   - title: The title shown in the notification.
+    ///   - body: The body shown in the notification.
+    ///   - timeInterval: The interval between deliveries, in seconds. It must
+    ///     be at least 60 seconds.
+    /// - Note: Validation and scheduling errors are printed instead of returned
+    ///   to the caller.
     public static func scheduleRepeatNotification(id: String, title: String, body: String, timeInterval: Int) {
         Task {
             do {
@@ -231,27 +286,32 @@ public struct NotificationManager {
     // MARK: Fetch
 
     /// Fetches all pending local notification requests.
+    /// - Returns: The requests that are scheduled and awaiting delivery.
     public static func getPendingNotificationRequests() async -> [UNNotificationRequest] {
         await center.pendingNotificationRequests()
     }
 
     /// Fetches the identifiers of all pending local notification requests.
+    /// - Returns: The identifiers of requests that are awaiting delivery.
     public static func getPendingNotificationRequestIDs() async -> [String] {
         await center.pendingNotificationRequests().map(\.identifier)
     }
 
     /// Fetches the identifiers of all pending local notification requests.
+    /// - Returns: The identifiers of requests that are awaiting delivery.
     @available(*, deprecated, renamed: "getPendingNotificationRequestIDs()")
     public static func getPendingNotificationRequestsIds() async -> [String] {
         await getPendingNotificationRequestIDs()
     }
 
     /// Fetches all delivered local notifications.
+    /// - Returns: The notifications that the system has delivered to the app.
     public static func getDeliveredNotifications() async -> [UNNotification] {
         await center.deliveredNotifications()
     }
 
     /// Fetches the identifiers of all delivered local notifications.
+    /// - Returns: The identifiers of notifications delivered by the system.
     public static func getDeliveredNotificationIDs() async -> [String] {
         await center.deliveredNotifications().map(\.request.identifier)
     }
@@ -259,6 +319,13 @@ public struct NotificationManager {
     // MARK: Update
 
     /// Replaces an existing pending notification. If the identifier does not exist, nothing happens.
+    /// - Parameters:
+    ///   - id: The identifier of the pending request to replace.
+    ///   - newTitle: The replacement notification title.
+    ///   - newBody: The replacement notification body.
+    ///   - newDate: The future delivery date for the replacement request.
+    /// - Throws: ``NotificationManagerError/triggerDateMustBeInFuture`` or an
+    ///   error from the system notification center.
     public static func replaceNotificationRequestFromId(
         id: String,
         newTitle: String,
@@ -298,11 +365,13 @@ public struct NotificationManager {
     }
 
     /// Removes pending notifications with the supplied identifiers.
+    /// - Parameter ids: The identifiers of pending requests to remove.
     public static func removePendingNotificationRequests(ids: [String]) {
         center.removePendingNotificationRequests(withIdentifiers: ids)
     }
 
     /// Removes delivered notifications with the supplied identifiers.
+    /// - Parameter ids: The identifiers of delivered notifications to remove.
     public static func removeDeliveredNotifications(ids: [String]) {
         center.removeDeliveredNotifications(withIdentifiers: ids)
     }
@@ -310,12 +379,18 @@ public struct NotificationManager {
     // MARK: Badge
 
     /// Updates the application's badge count.
+    /// - Parameter badge: The number to display on the app icon. Pass zero to
+    ///   remove the badge.
+    /// - Throws: An error from the system notification center.
     @available(iOS 16.0, macOS 13.0, visionOS 1.0, *)
     public static func setBadge(badge: Int) async throws {
         try await center.setBadgeCount(badge)
     }
 
-    /// Updates the application's badge count.
+    /// Updates the application's badge count without waiting for completion.
+    /// - Parameter badge: The number to display on the app icon. Pass zero to
+    ///   remove the badge.
+    /// - Note: Errors are printed instead of returned to the caller.
     @available(iOS 16.0, macOS 13.0, visionOS 1.0, *)
     public static func setBadge(badge: Int) {
         Task {
@@ -328,12 +403,14 @@ public struct NotificationManager {
     }
 
     /// Resets the application's badge count.
+    /// - Throws: An error from the system notification center.
     @available(iOS 16.0, macOS 13.0, visionOS 1.0, *)
     public static func resetBadge() async throws {
         try await center.setBadgeCount(0)
     }
 
-    /// Resets the application's badge count.
+    /// Resets the application's badge count without waiting for completion.
+    /// - Note: Errors are printed instead of returned to the caller.
     @available(iOS 16.0, macOS 13.0, visionOS 1.0, *)
     public static func resetBadge() {
         Task {
