@@ -204,6 +204,11 @@ if #available(iOS 16.0, macOS 13.0, visionOS 1.0, *) {
 }
 ```
 
+## Documentation
+
+Open the package in Xcode and choose **Product > Build Documentation** to browse
+the complete API documentation.
+
 ## Contributing
 
 Bug reports, feature requests, and pull requests are welcome through the GitHub repository.
