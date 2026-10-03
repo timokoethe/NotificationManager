@@ -36,6 +36,14 @@ validation and notification-center errors observable. Non-async
 fire-and-forget overloads are available for compatibility, but handle errors by
 printing them from an asynchronous task.
 
+Pending scheduling, replacement, queries, and removal share an internal queue.
+Synchronous calls register their operations before returning, so a subsequent
+removal waits for earlier additions to finish. Removal methods enqueue work and
+return without blocking. Await ``NotificationManager/getPendingNotificationRequests()``
+to observe the state after earlier operations complete. Concurrent calls are
+ordered at queue registration; direct system notification-center calls are outside
+this guarantee.
+
 ## Topics
 
 ### Authorization

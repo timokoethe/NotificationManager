@@ -18,6 +18,104 @@ final class NotificationManagerTests: XCTestCase {
         super.tearDown()
     }
 
+    func testSynchronousSchedulingThenRemovalLeavesNoPendingRequest() async {
+        for kind in [SynchronousScheduleKind.interval, .date, .repeating] {
+            scheduleSynchronously(kind, id: "request-id")
+            NotificationManager.removePendingNotificationRequests(ids: ["request-id"])
+
+            let requests = await NotificationManager.getPendingNotificationRequests()
+            XCTAssertTrue(requests.isEmpty)
+        }
+        XCTAssertEqual(center.addedRequests.count, 3)
+    }
+
+    func testRemovalWaitsForSuspendedAddToFinish() async {
+        let started = expectation(description: "Add started")
+        let gate = AddGate(started: started)
+        center.beforeAdd = { await gate.wait() }
+        scheduleSynchronously(.interval, id: "request-id")
+        await fulfillment(of: [started], timeout: 2)
+
+        NotificationManager.removePendingNotificationRequests(ids: ["request-id"])
+        await gate.release()
+
+        let requests = await NotificationManager.getPendingNotificationRequests()
+        XCTAssertTrue(requests.isEmpty)
+        XCTAssertEqual(center.addedRequests.count, 1)
+    }
+
+    func testRemoveAllFollowsEarlierSchedules() async {
+        scheduleSynchronously(.interval, id: "first")
+        scheduleSynchronously(.repeating, id: "second")
+        NotificationManager.removeAllPendingNotificationRequests()
+
+        let requests = await NotificationManager.getPendingNotificationRequests()
+        XCTAssertTrue(requests.isEmpty)
+        XCTAssertEqual(center.addedRequests.count, 2)
+    }
+
+    func testScopedRemovalPreservesOtherAndLaterRequests() async {
+        scheduleSynchronously(.interval, id: "other")
+        scheduleSynchronously(.interval, id: "request-id")
+        NotificationManager.removePendingNotificationRequests(ids: ["request-id"])
+        scheduleSynchronously(.date, id: "request-id")
+
+        let requests = await NotificationManager.getPendingNotificationRequests()
+        XCTAssertEqual(Set(requests.map(\.identifier)), ["other", "request-id"])
+        XCTAssertEqual(center.addedRequests.count, 3)
+    }
+
+    func testFailedAddDoesNotPreventLaterRemoval() async {
+        center.addError = TestError.addFailed
+        scheduleSynchronously(.interval, id: "request-id")
+        NotificationManager.removeAllPendingNotificationRequests()
+
+        let requests = await NotificationManager.getPendingNotificationRequests()
+        XCTAssertTrue(requests.isEmpty)
+        XCTAssertTrue(center.removedAllPendingRequests)
+    }
+
+    func testThrowingAddDoesNotBlockQueueAfterFailure() async {
+        center.addError = TestError.addFailed
+        await XCTAssertThrowsErrorAsync(
+            try await NotificationManager.scheduleNotification(
+                id: "request-id", title: "Title", body: "Body", timeInterval: 10
+            )
+        ) { error in
+            XCTAssertEqual(error as? TestError, .addFailed)
+        }
+        NotificationManager.removeAllPendingNotificationRequests()
+
+        _ = await NotificationManager.getPendingNotificationRequests()
+        XCTAssertTrue(center.removedAllPendingRequests)
+    }
+
+    func testReplacementSeesEarlierSynchronousSchedule() async throws {
+        scheduleSynchronously(.interval, id: "request-id")
+        try await NotificationManager.replaceNotificationRequestFromId(
+            id: "request-id", newTitle: "Replacement", newBody: "Body",
+            newDate: Date().addingTimeInterval(120)
+        )
+
+        let requests = await NotificationManager.getPendingNotificationRequests()
+        XCTAssertEqual(requests.count, 1)
+        XCTAssertEqual(requests.first?.content.title, "Replacement")
+    }
+
+    // Keep overload selection in a synchronous context.
+    private func scheduleSynchronously(_ kind: SynchronousScheduleKind, id: String) {
+        switch kind {
+        case .interval:
+            NotificationManager.scheduleNotification(id: id, title: "Title", body: "Body", timeInterval: 10)
+        case .date:
+            NotificationManager.scheduleNotification(
+                id: id, title: "Title", body: "Body", triggerDate: Date().addingTimeInterval(120)
+            )
+        case .repeating:
+            NotificationManager.scheduleRepeatNotification(id: id, title: "Title", body: "Body", timeInterval: 60)
+        }
+    }
+
     func testDefaultAuthorizationRequestsOnlyAlertSoundAndBadge() async throws {
         center.authorizationGranted = true
 
@@ -215,6 +313,7 @@ private final class TestNotificationCenter: UserNotificationCenter {
     var requestedAuthorizationOptions: UNAuthorizationOptions?
     var addedRequests: [UNNotificationRequest] = []
     var addError: Error?
+    var beforeAdd: (() async -> Void)?
     var pendingRequests: [UNNotificationRequest] = []
     var deliveredNotificationValues: [UNNotification] = []
     var removedIdentifierGroups: [[String]] = []
@@ -233,10 +332,13 @@ private final class TestNotificationCenter: UserNotificationCenter {
     }
 
     func addNotificationRequest(_ request: UNNotificationRequest) async throws {
+        await beforeAdd?()
         if let addError {
             throw addError
         }
         addedRequests.append(request)
+        pendingRequests.removeAll { $0.identifier == request.identifier }
+        pendingRequests.append(request)
     }
 
     func pendingNotificationRequests() async -> [UNNotificationRequest] {
@@ -249,6 +351,7 @@ private final class TestNotificationCenter: UserNotificationCenter {
 
     func removeAllPendingNotificationRequests() {
         removedAllPendingRequests = true
+        pendingRequests.removeAll()
     }
 
     func removeAllDeliveredNotifications() {
@@ -257,6 +360,7 @@ private final class TestNotificationCenter: UserNotificationCenter {
 
     func removePendingNotificationRequests(withIdentifiers identifiers: [String]) {
         removedIdentifierGroups.append(identifiers)
+        pendingRequests.removeAll { identifiers.contains($0.identifier) }
     }
 
     func removeDeliveredNotifications(withIdentifiers identifiers: [String]) {
@@ -309,5 +413,30 @@ private func XCTAssertThrowsErrorAsync<T>(
         XCTFail("Expected expression to throw", file: file, line: line)
     } catch {
         errorHandler(error)
+    }
+}
+
+private enum SynchronousScheduleKind {
+    case interval, date, repeating
+}
+
+private actor AddGate {
+    let started: XCTestExpectation
+    private var continuation: CheckedContinuation<Void, Never>?
+
+    init(started: XCTestExpectation) {
+        self.started = started
+    }
+
+    func wait() async {
+        await withCheckedContinuation { continuation in
+            self.continuation = continuation
+            started.fulfill()
+        }
+    }
+
+    func release() {
+        continuation?.resume()
+        continuation = nil
     }
 }
