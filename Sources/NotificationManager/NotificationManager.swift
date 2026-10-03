@@ -51,6 +51,7 @@ extension NotificationManagerError: LocalizedError {
 /// Manages local notification authorization, scheduling, querying, and removal.
 public struct NotificationManager {
     private static let defaultAuthorizationOptions: UNAuthorizationOptions = [.alert, .sound, .badge]
+    private static let pendingOperations = PendingNotificationOperations()
     private static var centerOverride: (any UserNotificationCenter)?
     static var center: any UserNotificationCenter {
         get { centerOverride ?? UNUserNotificationCenter.current() }
@@ -137,18 +138,15 @@ public struct NotificationManager {
         body: String,
         triggerDate: Date
     ) async throws {
-        let timeInterval = triggerDate.timeIntervalSinceNow
-        guard timeInterval > 0 else {
-            throw NotificationManagerError.triggerDateMustBeInFuture
-        }
-
-        try await scheduleNotification(
-            id: id,
-            title: title,
-            body: body,
-            timeInterval: timeInterval,
-            repeats: false
-        )
+        let notificationCenter = center
+        try await pendingOperations.enqueue {
+            let interval = triggerDate.timeIntervalSinceNow
+            guard interval > 0 else {
+                throw NotificationManagerError.triggerDateMustBeInFuture
+            }
+            let request = try makeRequest(id: id, title: title, body: body, timeInterval: interval, repeats: false)
+            try await notificationCenter.addNotificationRequest(request)
+        }.value
     }
 
     /// Schedules a notification for a future date without waiting for completion.
@@ -160,12 +158,12 @@ public struct NotificationManager {
     /// - Note: Validation and scheduling errors are printed instead of returned
     ///   to the caller.
     public static func scheduleNotification(id: String, title: String, body: String, triggerDate: Date) {
-        Task {
-            do {
-                try await scheduleNotification(id: id, title: title, body: body, triggerDate: triggerDate)
-            } catch {
-                print("Error: " + error.localizedDescription)
+        scheduleWithoutWaiting {
+            let interval = triggerDate.timeIntervalSinceNow
+            guard interval > 0 else {
+                throw NotificationManagerError.triggerDateMustBeInFuture
             }
+            return try makeRequest(id: id, title: title, body: body, timeInterval: interval, repeats: false)
         }
     }
 
@@ -201,12 +199,8 @@ public struct NotificationManager {
     /// - Note: Validation and scheduling errors are printed instead of returned
     ///   to the caller.
     public static func scheduleNotification(id: String, title: String, body: String, timeInterval: Int) {
-        Task {
-            do {
-                try await scheduleNotification(id: id, title: title, body: body, timeInterval: timeInterval)
-            } catch {
-                print("Error: " + error.localizedDescription)
-            }
+        scheduleWithoutWaiting {
+            try makeRequest(id: id, title: title, body: body, timeInterval: TimeInterval(timeInterval), repeats: false)
         }
     }
 
@@ -245,17 +239,8 @@ public struct NotificationManager {
     /// - Note: Validation and scheduling errors are printed instead of returned
     ///   to the caller.
     public static func scheduleRepeatNotification(id: String, title: String, body: String, timeInterval: Int) {
-        Task {
-            do {
-                try await scheduleRepeatNotification(
-                    id: id,
-                    title: title,
-                    body: body,
-                    timeInterval: timeInterval
-                )
-            } catch {
-                print("Error: " + error.localizedDescription)
-            }
+        scheduleWithoutWaiting {
+            try makeRequest(id: id, title: title, body: body, timeInterval: TimeInterval(timeInterval), repeats: true)
         }
     }
 
@@ -266,6 +251,32 @@ public struct NotificationManager {
         timeInterval: TimeInterval,
         repeats: Bool
     ) async throws {
+        let request = try makeRequest(id: id, title: title, body: body, timeInterval: timeInterval, repeats: repeats)
+        let notificationCenter = center
+        try await pendingOperations.enqueue {
+            try await notificationCenter.addNotificationRequest(request)
+        }.value
+    }
+
+    private static func scheduleWithoutWaiting(_ makeRequest: @escaping () throws -> UNNotificationRequest) {
+        let notificationCenter = center
+        pendingOperations.enqueue {
+            do {
+                let request = try makeRequest()
+                try await notificationCenter.addNotificationRequest(request)
+            } catch {
+                print("Error: " + error.localizedDescription)
+            }
+        }
+    }
+
+    private static func makeRequest(
+        id: String,
+        title: String,
+        body: String,
+        timeInterval: TimeInterval,
+        repeats: Bool
+    ) throws -> UNNotificationRequest {
         guard timeInterval > 0 else {
             throw NotificationManagerError.invalidTimeInterval
         }
@@ -279,8 +290,7 @@ public struct NotificationManager {
         content.sound = .default
 
         let trigger = UNTimeIntervalNotificationTrigger(timeInterval: timeInterval, repeats: repeats)
-        let request = UNNotificationRequest(identifier: id, content: content, trigger: trigger)
-        try await center.addNotificationRequest(request)
+        return UNNotificationRequest(identifier: id, content: content, trigger: trigger)
     }
 
     // MARK: Fetch
@@ -288,13 +298,16 @@ public struct NotificationManager {
     /// Fetches all pending local notification requests.
     /// - Returns: The requests that are scheduled and awaiting delivery.
     public static func getPendingNotificationRequests() async -> [UNNotificationRequest] {
-        await center.pendingNotificationRequests()
+        let notificationCenter = center
+        return await pendingOperations.enqueue {
+            await notificationCenter.pendingNotificationRequests()
+        }.value
     }
 
     /// Fetches the identifiers of all pending local notification requests.
     /// - Returns: The identifiers of requests that are awaiting delivery.
     public static func getPendingNotificationRequestIDs() async -> [String] {
-        await center.pendingNotificationRequests().map(\.identifier)
+        await getPendingNotificationRequests().map(\.identifier)
     }
 
     /// Fetches the identifiers of all pending local notification requests.
@@ -332,31 +345,39 @@ public struct NotificationManager {
         newBody: String,
         newDate: Date
     ) async throws {
-        let requests = await center.pendingNotificationRequests()
-        guard requests.contains(where: { $0.identifier == id }) else {
-            return
-        }
+        let notificationCenter = center
+        try await pendingOperations.enqueue {
+            let requests = await notificationCenter.pendingNotificationRequests()
+            guard requests.contains(where: { $0.identifier == id }) else {
+                return
+            }
 
-        let timeInterval = newDate.timeIntervalSinceNow
-        guard timeInterval > 0 else {
-            throw NotificationManagerError.triggerDateMustBeInFuture
-        }
+            let timeInterval = newDate.timeIntervalSinceNow
+            guard timeInterval > 0 else {
+                throw NotificationManagerError.triggerDateMustBeInFuture
+            }
 
-        // Adding a request with an existing identifier atomically replaces the old request.
-        try await scheduleNotification(
-            id: id,
-            title: newTitle,
-            body: newBody,
-            timeInterval: timeInterval,
-            repeats: false
-        )
+            let request = try makeRequest(
+                id: id,
+                title: newTitle,
+                body: newBody,
+                timeInterval: timeInterval,
+                repeats: false
+            )
+            try await notificationCenter.addNotificationRequest(request)
+        }.value
     }
 
     // MARK: Remove
 
-    /// Removes all pending notifications.
+    /// Enqueues removal of all pending notifications after earlier pending operations.
+    /// - Note: Returns without waiting. Await ``getPendingNotificationRequests()``
+    ///   to observe the state after removal.
     public static func removeAllPendingNotificationRequests() {
-        center.removeAllPendingNotificationRequests()
+        let notificationCenter = center
+        pendingOperations.enqueue {
+            notificationCenter.removeAllPendingNotificationRequests()
+        }
     }
 
     /// Removes all delivered notifications.
@@ -364,10 +385,15 @@ public struct NotificationManager {
         center.removeAllDeliveredNotifications()
     }
 
-    /// Removes pending notifications with the supplied identifiers.
+    /// Enqueues removal of pending notifications after earlier pending operations.
     /// - Parameter ids: The identifiers of pending requests to remove.
+    /// - Note: Returns without waiting. Await ``getPendingNotificationRequests()``
+    ///   to observe the state after removal.
     public static func removePendingNotificationRequests(ids: [String]) {
-        center.removePendingNotificationRequests(withIdentifiers: ids)
+        let notificationCenter = center
+        pendingOperations.enqueue {
+            notificationCenter.removePendingNotificationRequests(withIdentifiers: ids)
+        }
     }
 
     /// Removes delivered notifications with the supplied identifiers.
@@ -420,5 +446,39 @@ public struct NotificationManager {
                 print("Error: " + error.localizedDescription)
             }
         }
+    }
+}
+
+/// Registers operations synchronously, then waits for each predecessor to finish.
+/// A serial task chain also preserves ordering across suspension points.
+private final class PendingNotificationOperations {
+    private let lock = NSLock()
+    private var tail: Task<Void, Never>?
+
+    @discardableResult
+    func enqueue<Value>(_ operation: @escaping () async -> Value) -> Task<Value, Never> {
+        lock.lock()
+        defer { lock.unlock() }
+        let previous = tail
+        let task = Task {
+            await previous?.value
+            return await operation()
+        }
+        tail = Task { _ = await task.value }
+        return task
+    }
+
+    @discardableResult
+    func enqueue<Value>(_ operation: @escaping () async throws -> Value) -> Task<Value, Error> {
+        lock.lock()
+        defer { lock.unlock() }
+        let previous = tail
+        let task = Task {
+            await previous?.value
+            return try await operation()
+        }
+        // Failure must not prevent later operations (especially removals).
+        tail = Task { _ = try? await task.value }
+        return task
     }
 }
